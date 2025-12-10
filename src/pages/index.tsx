@@ -1,78 +1,168 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
+import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
+import { io, Socket } from "socket.io-client";
+import type { User } from "../components/Map";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+// Dynamic import for Map to disable SSR
+const MapComponent = dynamic(() => import("../components/Map"), { ssr: false });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+let socket: Socket;
 
 export default function Home() {
+  const [role, setRole] = useState<"driver" | "student">("student");
+  const [name, setName] = useState("");
+  const [vehicleId, setVehicleId] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [otherUsers, setOtherUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    // Initialize socket connection
+    socket = io();
+
+    socket.on("connect", () => {
+      console.log("Connected to server", socket.id);
+    });
+
+    socket.on("existing_users", (users: User[]) => {
+      setOtherUsers(users);
+    });
+
+    socket.on("driverLocation", (user: User) => {
+      setOtherUsers(prev => {
+        const index = prev.findIndex(u => u.id === user.id);
+        if (index !== -1) {
+          const newUsers = [...prev];
+          newUsers[index] = user;
+          return newUsers;
+        }
+        return [...prev, user];
+      });
+    });
+
+    socket.on("studentLocation", (user: User) => {
+      setOtherUsers(prev => {
+        const index = prev.findIndex(u => u.id === user.id);
+        if (index !== -1) {
+          const newUsers = [...prev];
+          newUsers[index] = user;
+          return newUsers;
+        }
+        return [...prev, user];
+      });
+    });
+
+    const handleUserLeft = (id: string) => {
+      setOtherUsers(prev => prev.filter(u => u.id !== id));
+    };
+
+    socket.on("driverLeft", handleUserLeft);
+    socket.on("studentLeft", handleUserLeft);
+
+    return () => {
+      // Don't disconnect on unmount in dev usually to avoid flicker, but strictly clean:
+      if (socket) socket.disconnect();
+    };
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name) return;
+
+    const details = role === "driver" ? { vehicleId } : {};
+    socket.emit("register", { role, name, details });
+
+    setCurrentUser({ id: socket.id!, role, name, lat: 0, lng: 0 });
+    setIsLoggedIn(true);
+  };
+
+  const onLocationUpdate = (lat: number, lng: number) => {
+    if (!currentUser) return;
+
+    // Only update if moved significantly or throttle? For MVP, every update is fine.
+    const updatedUser = { ...currentUser, lat, lng };
+    setCurrentUser(updatedUser);
+    socket.emit("updateLocation", { lat, lng });
+  };
+
+  if (!isLoggedIn) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-100">
+        <div className="w-full max-w-md bg-white p-8 rounded shadow-md">
+          <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">University Bus Tracking</h1>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-gray-700 font-semibold mb-2">Role</label>
+              <div className="flex space-x-4">
+                <button
+                  type="button"
+                  onClick={() => setRole("student")}
+                  className={`flex-1 py-2 rounded border ${role === "student" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300"}`}
+                >
+                  Student
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole("driver")}
+                  className={`flex-1 py-2 rounded border ${role === "driver" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300"}`}
+                >
+                  Driver
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-gray-700 font-semibold mb-2">Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                placeholder="Enter your name"
+                required
+              />
+            </div>
+
+            {role === "driver" && (
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2">Vehicle ID</label>
+                <input
+                  type="text"
+                  value={vehicleId}
+                  onChange={(e) => setVehicleId(e.target.value)}
+                  className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                  placeholder="Bus Number / Plate"
+                  required
+                />
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded transition"
+            >
+              Start Tracking
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={`${geistSans.className} ${geistMono.className} flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black`}
-    >
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the index.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="h-screen w-full relative">
+      <MapComponent currentUser={currentUser} otherUsers={otherUsers} onLocationUpdate={onLocationUpdate} />
+
+      <div className="absolute top-4 right-4 bg-white p-4 rounded shadow-lg z-[1000] border border-gray-200">
+        <h2 className="font-bold text-lg mb-2 text-gray-800">Status</h2>
+        <div className="text-sm text-gray-600">
+          <p><strong>You:</strong> {name} ({role})</p>
+          <p><strong>Others:</strong> {otherUsers.length} online</p>
+          {role === 'student' && <p>Looking for buses...</p>}
+          {role === 'driver' && <p>Broadcasting location...</p>}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs/pages/getting-started?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
