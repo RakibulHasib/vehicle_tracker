@@ -17,7 +17,7 @@ L.Icon.Default.mergeOptions({
 });
 
 // Configuration: Set to false to disable mock location (force real GPS only)
-const ENABLE_MOCK_LOCATION = true;
+const ENABLE_MOCK_LOCATION = false;
 
 // Custom Icons
 const busIcon = new L.Icon({
@@ -94,7 +94,7 @@ function LocationHandler({
                 setView: true,
                 watch: true,
                 enableHighAccuracy: true,
-                timeout: 30000, // 30 seconds for WiFi-based location
+                timeout: 60000, // 60 seconds for WiFi-based location
                 maximumAge: 0
             });
         } else {
