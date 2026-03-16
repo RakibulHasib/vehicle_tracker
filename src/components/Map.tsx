@@ -1,5 +1,5 @@
 
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useState } from "react";
@@ -28,7 +28,7 @@ const busIcon = new L.Icon({
 });
 
 const personIcon = new L.Icon({
-    iconUrl: "https://cdn-icons-png.flaticon.com/512/747/747376.png", // Better student/person icon
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png", // Better student/person icon
     iconSize: [35, 35],
     iconAnchor: [17, 17],
     popupAnchor: [0, -17]
@@ -113,6 +113,70 @@ function LocationHandler({
     return null;
 }
 
+// Sub-component for rendering other users and their popup logic
+function OtherUserMarker({ user, currentUser }: { user: User, currentUser: User | null }) {
+    const [showDistance, setShowDistance] = useState(false);
+
+    const distance = currentUser && currentUser.lat && currentUser.lng ?
+        L.latLng(currentUser.lat, currentUser.lng).distanceTo(L.latLng(user.lat, user.lng)) : null;
+
+    return (
+        <Marker position={[user.lat, user.lng]} icon={user.role === 'driver' ? busIcon : personIcon}>
+            <Popup>
+                <div className="text-center p-1 w-32">
+                    <p className="font-bold mb-1">{user.name} <span className="text-xs text-gray-500 capitalize">({user.role})</span></p>
+
+                    {currentUser && currentUser.lat && currentUser.role === 'student' ? (
+                        showDistance && distance !== null ? (
+                            <div className="mt-2">
+                                <p className="text-sm font-semibold text-blue-600 p-1 bg-blue-50 rounded">
+                                    {distance > 1000 ? (distance / 1000).toFixed(2) + ' km' : Math.round(distance) + ' m'}
+                                </p>
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setShowDistance(false);
+                                    }}
+                                    className="mt-1 w-full bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-2 py-1 rounded transition"
+                                >
+                                    Hide Distance
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    setShowDistance(true);
+                                }}
+                                className="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1.5 rounded transition shadow-sm"
+                            >
+                                Find Distance
+                            </button>
+                        )
+                    ) : (
+                        currentUser?.role !== 'student' ? null : <p className="text-xs text-red-500 mt-1">Location unknown</p>
+                    )}
+                </div>
+            </Popup>
+
+            {/* Draw a line if we are showing the distance */}
+            {currentUser && currentUser.lat && currentUser.lng && showDistance && distance !== null && (
+                <Polyline
+                    positions={[
+                        [currentUser.lat, currentUser.lng],
+                        [user.lat, user.lng]
+                    ]}
+                    pathOptions={{ color: '#3b82f6', weight: 4, opacity: 0.7, dashArray: '10, 10' }} // Blue dashed line
+                >
+                    <Tooltip permanent direction="center" className="bg-white/90 font-bold text-blue-600 shadow-sm border-0">
+                        {distance > 1000 ? (distance / 1000).toFixed(2) + ' km' : Math.round(distance) + ' m'}
+                    </Tooltip>
+                </Polyline>
+            )}
+        </Marker>
+    );
+}
+
 export default function MapComponent({
     currentUser,
     otherUsers,
@@ -171,9 +235,7 @@ export default function MapComponent({
 
                 {/* Other Users */}
                 {otherUsers.map(user => (
-                    <Marker key={user.id} position={[user.lat, user.lng]} icon={user.role === 'driver' ? busIcon : personIcon}>
-                        <Popup>{user.name} ({user.role})</Popup>
-                    </Marker>
+                    <OtherUserMarker key={user.id} user={user} currentUser={currentUser} />
                 ))}
             </MapContainer>
 

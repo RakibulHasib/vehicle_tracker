@@ -102,7 +102,10 @@ export default function Home() {
     // Only update if moved significantly or throttle? For MVP, every update is fine.
     const updatedUser = { ...currentUser, lat, lng };
     setCurrentUser(updatedUser);
-    socket.emit("updateLocation", { lat, lng });
+
+    if (socket) {
+      socket.emit("updateLocation", { lat, lng });
+    }
   };
 
   if (!isLoggedIn) {
