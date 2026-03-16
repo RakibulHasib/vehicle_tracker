@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { io, Socket } from "socket.io-client";
 import type { User } from "../components/Map";
@@ -17,12 +17,31 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [otherUsers, setOtherUsers] = useState<User[]>([]);
 
+  // Use a ref to keep track of the latest state for closure in event listeners
+  const stateRef = useRef({ role, name, vehicleId, isLoggedIn, currentUser });
+
+  useEffect(() => {
+    stateRef.current = { role, name, vehicleId, isLoggedIn, currentUser };
+  }, [role, name, vehicleId, isLoggedIn, currentUser]);
+
   useEffect(() => {
     // Initialize socket connection
     socket = io();
 
     socket.on("connect", () => {
       console.log("Connected to server", socket.id);
+
+      const state = stateRef.current;
+      if (state.isLoggedIn && state.name) {
+        console.log("Socket reconnected. Re-registering user...");
+        const details = state.role === "driver" ? { vehicleId: state.vehicleId } : {};
+        socket.emit("register", { role: state.role, name: state.name, details });
+
+        // Update the current user ID to the new socket ID just in case
+        if (state.currentUser) {
+          setCurrentUser({ ...state.currentUser, id: socket.id! });
+        }
+      }
     });
 
     socket.on("existing_users", (users: User[]) => {
