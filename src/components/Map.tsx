@@ -27,11 +27,28 @@ const busIcon = new L.Icon({
     popupAnchor: [0, -20]
 });
 
-const personIcon = new L.Icon({
-    iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png", // Better student/person icon
-    iconSize: [35, 35],
-    iconAnchor: [17, 17],
-    popupAnchor: [0, -17]
+const personIcon = L.divIcon({
+    html: `
+        <svg viewBox="0 0 100 130" width="30" height="39" style="filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.4))">
+            <!-- Main Dark Green Pin Body -->
+            <path d="M50,0 C22.4,0 0,22.4 0,50 C0,75 35,115 50,130 C65,115 100,75 100,50 C100,22.4 77.6,0 50,0 Z" fill="#1b5e20"/>
+            
+            <!-- Shadow Layer (similar to the darker red half on the bus pin) -->
+            <path d="M50,0 C77.6,0 100,22.4 100,50 C100,75 65,115 50,130 L50,0 Z" fill="#144617" opacity="0.3"/>
+            
+            <!-- Inner Light White/Gray Circle -->
+            <circle cx="50" cy="45" r="32" fill="#f0f0f0"/>
+            
+            <!-- Green User Icon in Center -->
+            <g transform="translate(30, 25) scale(1.6)" fill="#2e7d32">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </g>
+        </svg>
+    `,
+    className: '', // Remove default leaflet styles
+    iconSize: [30, 39],
+    iconAnchor: [15, 39],
+    popupAnchor: [0, -39]
 });
 
 export type User = {
