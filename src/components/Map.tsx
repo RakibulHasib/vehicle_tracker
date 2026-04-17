@@ -1,8 +1,8 @@
 
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline, Tooltip } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 // Fix for default Leaflet icons in Next.js
 const iconUrl = "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png";
@@ -76,12 +76,17 @@ function LocationHandler({
     onStatusChange: (status: LocationStatus, error?: string) => void;
 }) {
     const [useMockLocation, setUseMockLocation] = useState(false);
+    const initialCenterDone = useRef(false);
 
     const map = useMapEvents({
         locationfound(e) {
             onLocationUpdate(e.latlng.lat, e.latlng.lng);
             onStatusChange('found');
-            console.log('Location found:', e.latlng);
+            
+            if (!initialCenterDone.current) {
+                map.flyTo(e.latlng, 16);
+                initialCenterDone.current = true;
+            }
         },
         locationerror(e) {
             console.error('Location error:', e.message, 'Code:', e.code);
@@ -94,8 +99,10 @@ function LocationHandler({
                 onStatusChange('mock', 'Using mock location (Dhaka University)');
                 onLocationUpdate(MOCK_LOCATION.lat, MOCK_LOCATION.lng);
 
-                // Center map on mock location
-                map.setView([MOCK_LOCATION.lat, MOCK_LOCATION.lng], 15);
+                if (!initialCenterDone.current) {
+                    map.setView([MOCK_LOCATION.lat, MOCK_LOCATION.lng], 16);
+                    initialCenterDone.current = true;
+                }
             } else {
                 // Show error without fallback - forces real GPS only
                 onStatusChange('error', e.message);
@@ -108,7 +115,7 @@ function LocationHandler({
         if (!useMockLocation) {
             onStatusChange('searching');
             map.locate({
-                setView: true,
+                setView: false, // Changed from true to prevent map auto-jumping when user zooms/pans manually
                 watch: true,
                 enableHighAccuracy: true,
                 timeout: 60000, // 60 seconds for WiFi-based location
@@ -128,6 +135,33 @@ function LocationHandler({
     }, [map, useMockLocation]);
 
     return null;
+}
+
+// Center Location Button overlay
+function CenterLocationButton({ lat, lng }: { lat?: number, lng?: number }) {
+    const map = useMap();
+    
+    if (!lat || !lng) return null;
+    
+    return (
+        <button 
+            className="absolute bottom-6 right-4 bg-white p-2 rounded-full shadow-md z-[1000] border border-gray-200 hover:bg-gray-100 flex items-center justify-center transition"
+            onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                map.flyTo([lat, lng], 16);
+            }}
+            onPointerDown={(e) => e.stopPropagation()} // Overcome Leaflet map drag interception
+            onDoubleClick={(e) => e.stopPropagation()}
+            title="Move to my location"
+            style={{ width: '48px', height: '48px' }}
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
+                <circle cx="12" cy="12" r="10"></circle>
+                <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+        </button>
+    );
 }
 
 // Sub-component for rendering other users and their popup logic
@@ -254,6 +288,9 @@ export default function MapComponent({
                 {otherUsers.map(user => (
                     <OtherUserMarker key={user.id} user={user} currentUser={currentUser} />
                 ))}
+
+                {/* Center to My Location Button */}
+                <CenterLocationButton lat={currentUser?.lat} lng={currentUser?.lng} />
             </MapContainer>
 
             {/* Location Status Overlay */}
